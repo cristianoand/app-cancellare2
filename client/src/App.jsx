@@ -16,6 +16,52 @@ const parseYouTubeId = (url) => {
   return '';
 };
 
+// Hamburger Button Component
+function HamburgerButton({ isOpen, onClick }) {
+  return (
+    <button
+      className={`hamburger-btn ${isOpen ? 'open' : ''}`}
+      onClick={onClick}
+      aria-label="Menu"
+      aria-expanded={isOpen}
+    >
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+  );
+}
+
+// Side Menu Component
+function SideMenu({ isOpen, sections, activeSection, onSelectSection, onClose }) {
+  return (
+    <>
+      {isOpen && <div className="menu-overlay" onClick={onClose} />}
+      <nav className={`side-menu ${isOpen ? 'open' : ''}`}>
+        <div className="menu-header">
+          <h2>Menu</h2>
+          <button className="close-menu-btn" onClick={onClose} aria-label="Chiudi menu">✕</button>
+        </div>
+        <ul className="menu-list">
+          {sections.map((section) => (
+            <li key={section.id}>
+              <button
+                className={`menu-item ${activeSection === section.id ? 'active' : ''}`}
+                onClick={() => {
+                  onSelectSection(section.id);
+                  onClose();
+                }}
+              >
+                {section.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </>
+  );
+}
+
 function App() {
   const [tracks, setTracks] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -24,6 +70,8 @@ function App() {
   const [searchText, setSearchText] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('playlist');
 
   useEffect(() => {
     fetch('/api/tracks')
@@ -123,94 +171,129 @@ function App() {
 
   const ultimateGuitarLink = `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(searchText)}`;
 
+  const sections = [
+    { id: 'playlist', label: '🎵 Playlist' },
+    { id: 'add', label: '➕ Aggiungi canzone' },
+    { id: 'search', label: '🔍 Ricerca accordi' }
+  ];
+
   return (
     <div className="app-shell">
-      <header>
-        <h1>Song Study App</h1>
-        <p>Gestisci link YouTube, modifica l'ordine delle canzoni e cerca accordi su Ultimate Guitar.</p>
+      <header className="app-header">
+        <div className="header-content">
+          <HamburgerButton isOpen={menuOpen} onClick={() => setMenuOpen(!menuOpen)} />
+          <div className="header-title">
+            <h1>Song Study App</h1>
+          </div>
+        </div>
       </header>
 
-      <section className="grid-layout">
-        <article className="panel">
-          <h2>Aggiungi canzone</h2>
-          <label>
-            Titolo
-            <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo canzone" />
-          </label>
-          <label>
-            Link YouTube
-            <input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/..." />
-          </label>
-          <button onClick={handleAdd}>Aggiungi alla playlist</button>
-          {error && <div className="notice error">{error}</div>}
-        </article>
+      <SideMenu
+        isOpen={menuOpen}
+        sections={sections}
+        activeSection={activeSection}
+        onSelectSection={setActiveSection}
+        onClose={() => setMenuOpen(false)}
+      />
 
-        <article className="panel">
-          <h2>Ricerca accordi</h2>
-          <label>
-            Titolo o artista
-            <input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Esempio: Hallelujah" />
-          </label>
-          <a className="primary-link" href={ultimateGuitarLink} target="_blank" rel="noreferrer">
-            Cerca su Ultimate Guitar
-          </a>
-          <p>Apri il sito con il termine di ricerca per trovare testi e accordi.</p>
-        </article>
-      </section>
+      <div className="app-layout">
+        <main className="main-content">
+          {/* PLAYLIST SECTION */}
+          {activeSection === 'playlist' && (
+            <section className="panel">
+              <h2>Playlist</h2>
+              {loading ? (
+                <p>Caricamento...</p>
+              ) : tracks.length === 0 ? (
+                <p>Nessuna canzone salvata.</p>
+              ) : (
+                <div className="track-list">
+                  {tracks.map((track, index) => (
+                    <TrackRow
+                      key={track.id}
+                      track={track}
+                      index={index}
+                      selected={track.id === selectedTrack?.id}
+                      onSelect={() => setSelectedId(track.id)}
+                      onSave={handleUpdate}
+                      onDelete={() => handleDelete(track.id)}
+                      onMove={(dir) => moveTrack(index, dir)}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < tracks.length - 1}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
-      <section className="panel">
-        <h2>Playlist</h2>
-        {loading ? (
-          <p>Caricamento...</p>
-        ) : tracks.length === 0 ? (
-          <p>Nessuna canzone salvata.</p>
-        ) : (
-          <div className="track-list">
-            {tracks.map((track, index) => (
-              <TrackRow
-                key={track.id}
-                track={track}
-                index={index}
-                selected={track.id === selectedTrack?.id}
-                onSelect={() => setSelectedId(track.id)}
-                onSave={handleUpdate}
-                onDelete={() => handleDelete(track.id)}
-                onMove={(dir) => moveTrack(index, dir)}
-                canMoveUp={index > 0}
-                canMoveDown={index < tracks.length - 1}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+          {/* ADD SONG SECTION */}
+          {activeSection === 'add' && (
+            <section className="panel">
+              <h2>Aggiungi canzone</h2>
+              <label>
+                Titolo
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titolo canzone" />
+              </label>
+              <label>
+                Link YouTube
+                <input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} placeholder="https://youtube.com/..." />
+              </label>
+              <button onClick={handleAdd}>Aggiungi alla playlist</button>
+              {error && <div className="notice error">{error}</div>}
+            </section>
+          )}
 
-      <section className="panel video-panel">
-        <h2>Video embed</h2>
-        {selectedTrack ? (
-          <>
-            <div className="video-header">
-              <h3>{selectedTrack.title}</h3>
-              <a href={selectedTrack.youtube_url} target="_blank" rel="noreferrer">
-                Apri su YouTube
+          {/* SEARCH SECTION */}
+          {activeSection === 'search' && (
+            <section className="panel">
+              <h2>Ricerca accordi</h2>
+              <label>
+                Titolo o artista
+                <input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Esempio: Hallelujah" />
+              </label>
+              <a className="primary-link" href={ultimateGuitarLink} target="_blank" rel="noreferrer">
+                Cerca su Ultimate Guitar
               </a>
+              <p>Apri il sito con il termine di ricerca per trovare testi e accordi.</p>
+            </section>
+          )}
+
+          {/* ERROR DISPLAY */}
+          {error && activeSection !== 'add' && (
+            <div className="notice error" style={{ marginTop: '12px' }}>
+              {error}
             </div>
-            {embedUrl ? (
-              <div className="iframe-wrapper">
-                <iframe
-                  title="Video YouTube"
-                  src={embedUrl}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
+          )}
+        </main>
+
+        {/* VIDEO PANEL - Shows when track is selected */}
+        {selectedTrack && (
+          <aside className="video-sidebar">
+            <section className="panel video-panel">
+              <h2>Video in riproduzione</h2>
+              <div className="video-header">
+                <h3>{selectedTrack.title}</h3>
+                <a href={selectedTrack.youtube_url} target="_blank" rel="noreferrer" className="youtube-link">
+                  📺 YouTube
+                </a>
               </div>
-            ) : (
-              <div className="notice error">Link YouTube non valido.</div>
-            )}
-          </>
-        ) : (
-          <p>Seleziona una canzone per vedere il video embed.</p>
+              {embedUrl ? (
+                <div className="iframe-wrapper">
+                  <iframe
+                    title="Video YouTube"
+                    src={embedUrl}
+                    allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
+                <div className="notice error">Link YouTube non valido.</div>
+              )}
+            </section>
+          </aside>
         )}
-      </section>
+      </div>
     </div>
   );
 }
